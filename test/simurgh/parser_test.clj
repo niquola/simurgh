@@ -48,5 +48,14 @@
     :http/headers {"host" "localhost:8888"
                    "user-agent" "curl/7.54.0"
                    "accept" "*/*"}
-    :http/body #(= (read-buf %) "{\"username\":\"xyz\",\"password\":\"xyz\"}")}))
+    :http/body #(= (read-buf %) "{\"username\":\"xyz\",\"password\":\"xyz\"}")})
+
+
+
+
+
+
+  (sut/parse {:parse/state :init} (to-buf (nth messages-parts 0)) identity)
+
+  )
 
