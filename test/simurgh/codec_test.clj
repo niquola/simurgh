@@ -1,8 +1,9 @@
-(ns simurgh.parser-test
-  (:require [simurgh.parser :as sut]
+(ns simurgh.codec-test
+  (:require [simurgh.codec :as sut]
             [matcho.core :as matcho]
             [clojure.test :refer :all])
-  (:import [io.netty.buffer Unpooled]))
+  (:import [io.netty.buffer Unpooled]
+           [io.netty.buffer UnpooledByteBufAllocator]))
 
 (def messages-parts
   ["GET / HTTP/1.1\r\nHost: localhost:8888\r\nConnection: keep-alive\r\nCache-Control: max-age=0\r\nUser-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.84 Safari/537.36\r\nUpgrade-Insecure-Requests: 1\r\nAccept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8\r\nAccept-Encoding: gzip, deflate, br\r\nAccept-Language: en-US,en;q=0.9,ru;q=0.8,fr;q=0.7\r\nCookie: auth=%7B%22given_name%22%3A%22Nikolai%22%2C%22email%22%3A%22niquola%40gmail.com%22%2C%22aud%22%3A%22646067746089-6ujhvnv1bi8qvd7due8hdp3ob9qtcumv.apps.googleusercontent.com%22%2C%22locale%22%3A%22en%22%2C%22sub%22%3A%22109731002115757803058%22%2C%22iss%22%3A%22https%3A%2F%2Faccounts.google.com%22%2C%22name%22%3A%22Nikolai%20Ryzhikov%22%2C%22exp%22%3A1514505952%2C%22azp%22%3A%22646067746089-6ujhvnv1bi8qvd7due8hdp3ob9qtcumv.apps.googleusercontent.com%22%2C%22email_verified%22%3Atrue%2C%22family_name%22%3A%22Ryzhikov%22%2C%22id_token%22%3A%22eyJhbGciOiJSUzI1NiIsImtpZCI6ImFmMDBiY"
@@ -54,8 +55,22 @@
 
 
 
-
   (sut/parse {:parse/state :init} (to-buf (nth messages-parts 0)) identity)
+
+  (is (= "HTTP/1.1 200 OK\r\ncontent-type: text\r\ncontent-length: 5\r\n\r\nHello"
+         (read-buf
+          (sut/response-to-http (Unpooled/compositeBuffer)
+                                (UnpooledByteBufAllocator/DEFAULT)
+                                {:http/response
+                                 {:http/status 200 :http/body "Hello" :http/headers {"content-type" "text"}}}))))
+  
+  (is (= "HTTP/1.1 200 OK\r\ncontent-type: text\r\ncontent-length: 7\r\n\r\n{\"a\":1}"
+         (read-buf
+          (sut/response-to-http (Unpooled/compositeBuffer)
+                                (UnpooledByteBufAllocator/DEFAULT)
+                                {:http/response
+                                 {:http/status 200 :http/body "{\"a\":1}" :http/headers {"content-type" "text"}}}))))
+  
 
   )
 

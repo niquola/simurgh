@@ -1,7 +1,11 @@
-(ns simurgh.parser
+(ns simurgh.codec
   (:require [clojure.string :as str])
   (:import [io.netty.buffer ByteBuf]
+           [java.nio CharBuffer]
            [java.nio.charset Charset]
+           [io.netty.buffer ByteBufUtil]
+           [io.netty.buffer CompositeByteBuf]
+           [io.netty.buffer ByteBufAllocator]
            [io.netty.buffer ByteBufProcessor]))
 
 ;; https://github.com/netty/netty/blob/eb7f751ba519cbcab47d640cd18757f09d077b55/codec-http/src/main/java/io/netty/handler/codec/http/HttpObjectDecoder.java
@@ -69,3 +73,22 @@
         (assoc state :parse/state :init))
 
     :else state))
+
+(defn str-to-bytebuf [^ByteBufAllocator aloc ^String s]
+  (assert s)
+  (ByteBufUtil/encodeString aloc (CharBuffer/wrap s) utf))
+
+(defn response-to-http
+  [^CompositeByteBuf cbb
+   ^ByteBufAllocator aloc
+   {{st :http/status body :http/body hs :http/headers} :http/response}]
+  (let [bb (str-to-bytebuf aloc body)
+        hs (assoc (or hs {}) "content-length" (str (.readableBytes bb)))
+        hss (->> (mapv (fn [[k v]] (str k ": " v)) hs)
+                 (str/join "\r\n"))
+        s (format "HTTP/1.1 %s OK\r\n%s\r\n\r\n" (or st 200) hss)]
+
+    (.addComponent cbb true (str-to-bytebuf aloc s))
+    (.addComponent cbb true bb)
+
+    cbb))

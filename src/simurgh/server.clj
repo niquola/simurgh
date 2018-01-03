@@ -1,5 +1,5 @@
 (ns simurgh.server
-  (:require [simurgh.parser :as parser])
+  (:require [simurgh.codec :as codec])
   (:import
    [java.net InetAddress]
    [java.nio.charset Charset]
@@ -29,9 +29,9 @@
   (into-array ChannelHandler [cl]))
 
 (def utf (Charset/forName "UTF-8"))
+
 (defn read-buf [b]
   (.toString b utf))
-
 
 (defn start [handler {port :port :as opts}]
   (let [mg (NioEventLoopGroup.)
@@ -48,7 +48,7 @@
                                   (channelActive [^ChannelHandlerContext ctx]
                                     (println "channelActive"))
                                   (decode [^ChannelHandlerContext ctx ^ByteBuf in out]
-                                    (let [s (parser/parse @state in (fn [req] (handler ctx req)))]
+                                    (let [s (codec/parse @state in (fn [req] (handler ctx req)))]
                                       (reset! state s)))
                                   (exceptionCaught [^ChannelHandlerContext ctx cause]
                                     (println "Error" cause)
@@ -61,18 +61,16 @@
        :start-future f
        :slave-group sg})))
 
+
 (defn handler [ctx req]
-  ;; (println "Req:")
-  (let [body (str req) 
-        bba (.getBytes body)
-        s (format "HTTP/1.1 200 OK\r\nContent-Length: %s\r\n\r\n%s" (alength bba) body)
-        ba (.getBytes s)
-        buf (-> ctx (.alloc) (.buffer (alength ba)))]
-    (.writeBytes buf ba)
-    ;; (println "written" buf)
-    (.writeAndFlush ctx buf)
-    ;; (.close ctx)
-    ))
+  (->> (codec/response-to-http
+       (-> ctx (.alloc) (.compositeBuffer))
+       (.alloc ctx)
+       {:http/response
+        {:http/status 200
+         :http/headers {"content-type" "text"}
+         :http/body (str req)}})
+      (.writeAndFlush ctx )))
 
 (comment
   (def srv (start handler {:port 8889}))
